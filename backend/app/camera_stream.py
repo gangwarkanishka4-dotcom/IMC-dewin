@@ -10,7 +10,7 @@ import time
 
 import cv2
 
-from . import camera_db, config
+from . import camera_db, config, footfall
 from .face_pipeline import get_pipeline
 
 log = logging.getLogger("camera_stream")
@@ -139,6 +139,10 @@ class CameraStream:
                     self._pipeline_future = self._pipeline_executor.submit(
                         self._feed_pipeline, frame, self.has_real_viewer()
                     )
+
+                # Unique footfall (gate cameras only — no-op otherwise).
+                # Hands off to its own executor, same reasoning as above.
+                footfall.service.feed(self.camera_id, frame)
 
                 # Quality 70 rather than 80: these are full 1920x1080 frames,
                 # so the encode itself and the ~350KB/frame it produced were
