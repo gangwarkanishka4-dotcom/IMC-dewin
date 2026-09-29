@@ -41,100 +41,36 @@ prediction_history = deque(maxlen=10)
 # 4. LOAD FACE DETECTOR
 # ==========================================
 
+# The frontal face detector only finds faces that
+# point roughly at the camera, so a detected face
+# means the person is facing straight
+
 face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades +
     "haarcascade_frontalface_default.xml"
 )
 
 
-eye_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades +
-    "haarcascade_eye_tree_eyeglasses.xml"
-)
-
-
 # ==========================================
-# 5. ATTENTION (FACING STRAIGHT) SETTINGS
+# 5. ATTENTION SETTINGS
 # ==========================================
 
-# How far (as a fraction of face width) the midpoint
-# between the eyes may drift from the face centre
-# before the head counts as turned sideways
+# Faces are searched for on a smaller copy of the
+# frame, which is much faster on a CPU
 
-MAX_EYE_OFFSET = 0.12
-
-
-# How much higher one eye may be than the other
-# (as a fraction of face height) before the head
-# counts as tilted
-
-MAX_EYE_TILT = 0.10
+DETECTION_SCALE = 0.5
 
 
-# Store attention results from last 15 frames
-# (1 = facing straight, 0 = distracted)
+# Store attention results from last 8 frames
+# (1 = facing straight, 0 = looking away)
 
-attention_history = deque(maxlen=15)
+attention_history = deque(maxlen=8)
 
 
-def facing_straight(face_gray):
+# Last place a face was seen, so "Distracted"
+# can be drawn where the person is
 
-    """Person counts as facing straight when both eyes
-    are visible and sit evenly on either side of the
-    face centre. Eye contact with the camera is not
-    required."""
-
-    h, w = face_gray.shape
-
-    # Eyes are in the upper half of the face
-
-    upper_face = face_gray[:h // 2, :]
-
-    eyes = eye_cascade.detectMultiScale(
-        upper_face,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(w // 8, w // 8)
-    )
-
-    # Head turned, looking down or eyes closed
-
-    if len(eyes) < 2:
-        return False
-
-    # Keep the two largest detections
-
-    eyes = sorted(
-        eyes,
-        key=lambda e: e[2] * e[3],
-        reverse=True
-    )[:2]
-
-    centres = [
-        (ex + ew / 2, ey + eh / 2)
-        for (ex, ey, ew, eh) in eyes
-    ]
-
-    (x1, y1), (x2, y2) = centres
-
-    # Both detections on the same side = false match
-
-    if abs(x1 - x2) < w * 0.2:
-        return False
-
-    # Head turned left / right
-
-    eyes_midpoint = (x1 + x2) / 2
-
-    if abs(eyes_midpoint - w / 2) > w * MAX_EYE_OFFSET:
-        return False
-
-    # Head tilted
-
-    if abs(y1 - y2) > h * MAX_EYE_TILT:
-        return False
-
-    return True
+last_face_box = None
 
 
 # ==========================================
@@ -142,6 +78,28 @@ def facing_straight(face_gray):
 # ==========================================
 
 cap = cv2.VideoCapture(0)
+
+
+# Keep only the newest frame so the video
+# doesn't fall behind
+
+cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+
+# Open the window on top of all other windows
+# so it doesn't hide behind the editor
+
+WINDOW_NAME = "Real-Time Facial Emotion Recognition"
+
+cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+
+cv2.resizeWindow(WINDOW_NAME, 800, 600)
+
+cv2.setWindowProperty(
+    WINDOW_NAME,
+    cv2.WND_PROP_TOPMOST,
+    1
+)
 
 
 while True:
@@ -164,48 +122,61 @@ while True:
 
 
     # ======================================
-    # DETECT FACES
+    # DETECT FACES (ON SMALLER FRAME)
     # ======================================
+
+    small_gray = cv2.resize(
+        gray,
+        None,
+        fx=DETECTION_SCALE,
+        fy=DETECTION_SCALE
+    )
+
+
+    # Boost contrast so faces are found in dim light
+
+    small_gray = cv2.equalizeHist(small_gray)
 
     faces = face_cascade.detectMultiScale(
 
-        gray,
+        small_gray,
 
         scaleFactor=1.1,
 
         minNeighbors=5,
 
-        minSize=(50, 50)
+        minSize=(30, 30)
 
     )
 
 
     # ======================================
-    # NO FACE = LOOKING AWAY
+    # CHECK ATTENTION
     # ======================================
 
-    if len(faces) == 0:
+    attention_history.append(
+        1 if len(faces) > 0 else 0
+    )
 
-        attention_history.append(0)
-
-        if np.mean(attention_history) < 0.5:
-
-            cv2.putText(
-                frame,
-                "Distracted",
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                (0, 0, 255),
-                2
-            )
+    distracted = np.mean(attention_history) < 0.5
 
 
     # ======================================
     # PROCESS FACE
     # ======================================
 
-    for (x, y, w, h) in faces:
+    if len(faces) > 0:
+
+
+        # Use the largest face, scaled back
+        # to full frame size
+
+        x, y, w, h = [
+            int(v / DETECTION_SCALE)
+            for v in max(faces, key=lambda f: f[2] * f[3])
+        ]
+
+        last_face_box = (x, y, w, h)
 
 
         # Crop face
@@ -214,17 +185,6 @@ while True:
             y:y + h,
             x:x + w
         ]
-
-
-        # ==================================
-        # CHECK ATTENTION
-        # ==================================
-
-        attention_history.append(
-            1 if facing_straight(face) else 0
-        )
-
-        distracted = np.mean(attention_history) < 0.5
 
 
         # Resize
@@ -260,10 +220,14 @@ while True:
         # MODEL PREDICTION
         # ==================================
 
-        prediction = model.predict(
+        # Calling the model directly is much
+        # faster than model.predict() for a
+        # single image
+
+        prediction = model(
             face,
-            verbose=0
-        )[0]
+            training=False
+        ).numpy()[0]
 
 
         # ==================================
@@ -275,38 +239,60 @@ while True:
         )
 
 
-        # ==================================
-        # CALCULATE AVERAGE PREDICTION
-        # ==================================
+    # ======================================
+    # DRAW RESULT
+    # ======================================
 
-        average_prediction = np.mean(
-            prediction_history,
-            axis=0
-        )
+    if last_face_box is not None:
 
-
-        # Get final emotion
-
-        predicted_index = np.argmax(
-            average_prediction
-        )
+        x, y, w, h = last_face_box
 
 
-        emotion = emotion_labels[
-            predicted_index
-        ]
+        if distracted:
+
+            # Distracted replaces the emotion
+
+            text = "Distracted"
+
+            color = (0, 0, 255)
+
+        else:
+
+            # ==============================
+            # CALCULATE AVERAGE PREDICTION
+            # ==============================
+
+            average_prediction = np.mean(
+                prediction_history,
+                axis=0
+            )
 
 
-        confidence = (
-            average_prediction[
+            # Get final emotion
+
+            predicted_index = np.argmax(
+                average_prediction
+            )
+
+
+            emotion = emotion_labels[
                 predicted_index
-            ] * 100
-        )
+            ]
 
 
-        # Green when engaged, red when distracted
+            confidence = (
+                average_prediction[
+                    predicted_index
+                ] * 100
+            )
 
-        color = (0, 0, 255) if distracted else (0, 255, 0)
+
+            text = (
+                f"{emotion}: "
+                f"{confidence:.1f}%"
+            )
+
+            color = (0, 255, 0)
 
 
         # ==================================
@@ -329,22 +315,8 @@ while True:
 
 
         # ==================================
-        # DISPLAY EMOTION
+        # DISPLAY TEXT
         # ==================================
-
-        # Distracted replaces the emotion
-
-        if distracted:
-
-            text = "Distracted"
-
-        else:
-
-            text = (
-                f"{emotion}: "
-                f"{confidence:.1f}%"
-            )
-
 
         cv2.putText(
 
@@ -371,7 +343,7 @@ while True:
 
     cv2.imshow(
 
-        "Real-Time Facial Emotion Recognition",
+        WINDOW_NAME,
 
         frame
 
@@ -381,6 +353,16 @@ while True:
     # Press Q to exit
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
+
+        break
+
+
+    # Closing the window with X also exits
+
+    if cv2.getWindowProperty(
+        WINDOW_NAME,
+        cv2.WND_PROP_VISIBLE
+    ) < 1:
 
         break
 
