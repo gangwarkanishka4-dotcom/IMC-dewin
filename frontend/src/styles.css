@@ -1,0 +1,134 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * DeWIN Vision design system.
+ * All colors in oklch, derived from the DeWIN brand palette.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+
+  --color-navy: var(--navy);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-soft: var(--brand-blue-soft);
+  --color-brand-blue-tint: var(--brand-blue-tint);
+  --color-purple: var(--purple);
+  --color-purple-soft: var(--purple-soft);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
+  --color-cyan: var(--cyan);
+  --color-cyan-soft: var(--cyan-soft);
+  --color-live: var(--live);
+  --color-text-secondary: var(--text-secondary);
+
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-card: 0 1px 2px oklch(0.2823 0.0874 267.94 / 6%);
+  --shadow-soft: 0 6px 20px -12px oklch(0.2823 0.0874 267.94 / 18%);
+}
+
+:root {
+  --radius: 1rem;
+
+  --brand-blue: oklch(0.5461 0.2152 262.88);
+  --navy: oklch(0.3791 0.1378 265.52);
+  --brand-blue-soft: oklch(0.9705 0.0142 254.6);
+  --brand-blue-tint: oklch(0.987 0.0062 255.47);
+  --purple: oklch(0.5413 0.2466 293.01);
+  --purple-soft: oklch(0.9691 0.0161 293.76);
+  --pink: oklch(0.6559 0.2118 354.31);
+  --pink-soft: oklch(0.9714 0.0141 343.2);
+  --cyan: oklch(0.7148 0.1257 215.22);
+  --cyan-soft: oklch(0.9841 0.0189 200.87);
+  --live: oklch(0.6959 0.1491 162.48);
+  --text-secondary: oklch(0.5544 0.0407 257.42);
+
+  --background: oklch(0.9842 0.0034 247.86);
+  --foreground: oklch(0.2823 0.0874 267.94);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2823 0.0874 267.94);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2823 0.0874 267.94);
+  --primary: oklch(0.5461 0.2152 262.88);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9705 0.0142 254.6);
+  --secondary-foreground: oklch(0.3791 0.1378 265.52);
+  --muted: oklch(0.9705 0.0142 254.6);
+  --muted-foreground: oklch(0.7107 0.0351 256.79);
+  --accent: oklch(0.9705 0.0142 254.6);
+  --accent-foreground: oklch(0.5461 0.2152 262.88);
+  --destructive: oklch(0.6559 0.2118 354.31);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.9288 0.0126 255.51);
+  --input: oklch(0.9288 0.0126 255.51);
+  --ring: oklch(0.5461 0.2152 262.88);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@utility sidebar-surface {
+  background: linear-gradient(
+    180deg,
+    var(--brand-blue-tint) 0%,
+    var(--brand-blue-soft) 55%,
+    var(--purple-soft) 100%
+  );
+}
+
+@utility header-glow {
+  background: linear-gradient(
+    110deg,
+    var(--card) 45%,
+    var(--brand-blue-soft) 72%,
+    var(--purple-soft) 100%
+  );
+}
+
+@utility live-dot {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 9999px;
+  background: var(--live);
+  box-shadow: 0 0 0 3px oklch(0.6959 0.1491 162.48 / 18%);
+}
